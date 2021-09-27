@@ -1,0 +1,321 @@
+CREATE TYPE exchanges_varray AS VARRAY(3) OF VARCHAR(40)
+/
+CREATE TYPE stock_type as object (
+	company varchar(20),
+	cprice number(6,2),
+	exchanges exchanges_varray,
+	lastdividend number(4,2),
+	eps number(4,2)
+
+)
+/ 
+
+--Create Address ccuz its not depending on any other----
+create type address_type as object (
+	streetno varchar(10),
+	streetname varchar(50),
+	supurb varchar(40),
+	stateaddr varchar(30),
+	pin varchar(10)
+)
+
+----------------
+create type investment_type as object (
+	company ref stock_type,
+	pprice number(6,2),
+	pdate date,
+	qty number(6)
+)
+
+--Create Investment Nested Table
+create type investment_nested_ttype as table of investment_type
+/
+
+create type client_type as object (
+	
+	name varchar(30),
+	address address_type,
+	investments investment_nested_ttype
+)
+
+create table stock of stock_type (
+	constraint st_pk primary key (company)
+)
+
+create table clients of client_type (
+	constraint client_pk primary key (name)
+)nested table investments store as investment_tab
+
+---Seperate Query to add foreign keys to Nested Tables
+alter table investment_tab
+add scope for(company) is stock
+
+----Insert values for Stock Table
+
+insert into stock values (
+	stock_type('BHP', 10.50, exchanges_varray('Sydney', 'New York'), 1.50, 3.20)
+)
+/
+
+insert into stock values (
+	stock_type('IBM', 70.00, exchanges_varray('New York', 'London', 'Tokyo'), 4.25, 10.00)
+)
+/
+
+insert into stock values (
+	stock_type('INTEL', 76.50, exchanges_varray('New York', 'London'), 5.00, 12.40)
+)
+/
+
+insert into stock values (
+	stock_type('FORD', 40.00, exchanges_varray('New York'), 2.00, 8.50)
+)
+/
+
+insert into stock values (
+	stock_type('GM', 60.00, exchanges_varray('New York'), 2.50, 9.20)
+)
+/
+
+insert into stock values (
+	stock_type('INFOSYS', 45.00, exchanges_varray('New York'), 3.00, 7.80)
+)
+/
+----Insert Into Investments
+
+insert into clients values (
+	client_type('John Smith', address_type('3', 'East Av', 'Bentley', 'WA', '6102'), 
+	investment_nested_ttype(investment_type((Select REF(A) from stock A where A.company = 'BHP'), 12.00, '02 - OCT - 01', 1000),
+							investment_type((Select REF(A) from stock A where A.company = 'BHP'), 10.50, '08 - JUN - 02', 2000),
+							investment_type((Select REF(A) from stock A where A.company = 'IBM'), 58.00, '12 - FEB - 00', 500),
+							investment_type((Select REF(A) from stock A where A.company = 'IBM'), 65.00, '10 - APR - 01', 1200),
+							investment_type((Select REF(A) from stock A where A.company = 'INFOSYS'), 64.00, '11 - AUG - 01', 1000))
+						)	
+)
+
+select * from clients
+select * from stock
+
+insert into clients values (
+	client_type('Jill Brody', address_type('42', 'Bent St', 'Perth', 'WA', '6001'), 
+	investment_nested_ttype(investment_type((Select REF(A) from stock A where A.company = 'INTEL'), 35.00, '30 - JAN - 00', 300),
+							investment_type((Select REF(A) from stock A where A.company = 'INTEL'), 54.00, '30 - JAN - 01', 400),
+							investment_type((Select REF(A) from stock A where A.company = 'INTEL'), 60.00, '02 - OCT - 01', 200),
+							investment_type((Select REF(A) from stock A where A.company = 'FORD'), 40.00, '05 - OCT - 99', 300),
+							investment_type((Select REF(A) from stock A where A.company = 'GM'), 55.50, '12 - DEC - 00', 500))
+						)	
+)
+
+
+
+--------Questions---------------
+
+--Question 01
+select distinct c.name, i.company.company, i.company.cprice, i.company.lastdividend, i.company.eps  
+from clients c, table(c.investments) i
+/
+
+
+--Question 02
+	select c.name, i.company.company, sum(i.qty), sum(i.qty*i.pprice) / sum(i.qty) as Average
+	from clients c, table(c.investments) i
+	group by c.name, i.company.company
+	/
+	
+--Question 03
+select c.name, i.company.company, sum(i.qty) as Total, sum(i.qty * i.company.cprice) as Value
+from clients c, table(c.investments) i, table(i.company.exchanges) e
+where e.column_value = 'New York'
+group by (c.name, i.company.company)
+/
+
+--Need to get a table for the Vaaray also inorder to get the data types same
+--column_value is used to call then individual values of the Vaarray 
+
+--Question 04
+select c.name, sum(i.qty * i.pprice) as Total
+from clients c, table(c.investments) i
+group by c.name
+
+--Question 05
+select c.name, sum(i.company.cprice * i.qty) as CurrPrice, sum(i.pprice * i.qty) as PPrice, sum(i.company.cprice * i.qty) - sum(i.pprice * i.qty)  as ProfitLoss
+from clients c, table(c.investments) i
+group by c.name
+
+--Question 06
+--1st Transaction
+insert into table(	
+select c.investments
+				from clients c
+				where c.name = 'Jill Brody') values(select  i.company.cprice, SYSDATE, i.qty
+from clients c, table(c.investments) i
+where c.name = 'John Smith' AND i.company.company = 'INFOSYS')
+
+delete table(select c.investments
+				from clients c
+				where c.name = 'John Smith') i
+where i.company.company = 'INFOSYS'
+
+UPDATE clients c, table(c.investments) i
+SET i. = 'Anderson'
+WHERE customer_id = 5000;
+
+
+
+
+
+insert into table(	select c.investments
+				from clients c
+				where c.name = 'John Smith')
+select i.company, i.company.cprice, SYSDATE, i.qty
+from clients c, table(c.investments) i
+where c.name = 'Jill Brody' AND i.company.company = 'GM'
+
+
+delete table(select c.investments
+				from clients c
+				where c.name = 'Jill Brody') i
+where i.company.company = 'GM'
+
+				
+select c.name, i.company.company, i.company.cprice,i.qty ,SYSDATE 
+from clients c, table(c.investments) i
+/
+Alter type stock_type
+Add member Function yield return float cascade
+
+create or replace type  body stock_type as
+member function yield return float is
+	begin
+		return ((self.lastdividend/self.cprice)*100);
+	end yield ;
+end;
+/
+select s.yield(),s.cprice
+from stock s
+
+select s.company,s.yield() yield
+from stock s
+/
+B
+-- (b) --
+alter type stock_type
+add member function cpriceUSD(rate float)
+return float cascade
+
+create or replace type  body stock_type as
+member function yield return float is
+	begin
+		return (self.lastdividend/self.cprice)*100;
+	end yield;
+member function cpriceUSD(rate float) return float is
+	begin
+		return SELF.cprice*rate;
+	end cpriceUSD;
+end  ;
+
+select s.yield(),s.cpriceUSD(7.8)
+from stock s
+
+select *
+from stock s
+/
+-- (c) --
+alter type stock_type
+add member function numOfexch return integer cascade
+/
+
+create or replace type  body stock_type as
+member function yield return float is
+	begin
+		return (self.lastdividend/self.cprice)*100;
+	end yield;
+member function cpriceUSD(rate float) return float is
+	begin
+		return SELF.cprice*rate;
+	end cpriceUSD;
+member function numOfexch return integer is
+    excount integer;
+	begin
+		select count(p.COLUMN_VALUE) into excount
+		from table(self.exchanges) p;
+		return excount;
+	end numOfexch;
+end;
+/
+
+-- (d) --
+
+alter type client_type
+add member function PurchaseValue return float cascade
+/
+
+create or replace type body client_type as
+	member function PurchaseValue return float is
+	tot float;
+	begin
+		select sum(i.pprice*i.qty) into tot
+		from clients c, table(c.investments) i;
+		return tot;
+	end PurchaseValue;
+end;
+/
+select sum(i.pprice*i.qty) as p
+from clients c, table(c.investments) i
+
+alter type client_type
+add member function getProfit return float cascade
+/
+
+create or replace type body client_type as
+		member function PurchaseValue return float is
+	tot float;
+	begin
+		select sum(i.pprice*i.qty) into tot
+		from clients c, table(c.investments) i;
+		return tot;
+	end PurchaseValue;
+	member function getProfit return float is
+	tProfit float;
+	begin
+		select sum((i.company.cprice-i.pprice)*i.qty) into tProfit
+		from clients c, table(c.investments) i;
+		return tProfit;
+	end getProfit;
+end;
+/
+
+-- (02). --
+
+-- (a) --
+
+//sir
+select s.company,e.column_value,s.yield(),s.cpriceUSD(0.74)
+from stock s,table(s.exchanges) e
+
+-- (b) --
+
+select s.company,s.cprice, s.numOfexch()
+from stock s
+where s.numOfexch()>1
+/
+
+-- (c) --
+
+select distinct c.name, i.company.company, i.company.yield(), i.company.cprice
+, i.company.eps
+from clients c , table(c.investments ) i
+/
+
+-- (d) --
+
+select c.name, c.PurchaseValue()
+from clients c
+/
+
+-- (e) --
+
+select c.name, c.getProfit()
+from clients c
+/
+

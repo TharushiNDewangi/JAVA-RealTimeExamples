@@ -1,0 +1,129 @@
+create type dept_t;
+
+create type emp_t AS OBJECT(
+    EMPNO CHAR(6),
+    FIRSTNAME VARCHAR(12),
+    LASTNAME VARCHAR(15),
+    WORKDEPT REF dept_t,
+    SEX CHAR(1),
+    BIRTHDATE DATE,
+    SALARY NUMBER(8,2)
+    );
+    
+CREATE TYPE dept_t AS OBJECT(
+    DEPTNO CHAR(3),
+    DEPTNAME VARCHAR(36),
+    MGRNO REF emp_t,
+    ADMRDEPT REF dept_t
+
+)
+create table OREMP of emp_t(
+    constraint OREMP_PK PRIMARY KEY(EMPNO),
+    constraint OREMP_FIRSTNAME_NN FIRSTNAME NOT NULL,
+    constraint OREMP_LASTNAME_NN LASTNAME NOT NULL,
+    constraint OREMP_SEC_CK CHECK (SEX='M' OR SEX ='F' OR SEX='m' OR SEX='f')
+    );
+
+create table ORDEP of dept_t(
+    constraint ORDEPT_PK PRIMARY KEY(DEPTNO),
+    constraint ORDEPT_DEPTNAME_NN DEPTNAME NOT NULL,
+    constraint ORDEPT_MGR_FK FOREIGN KEY(MGRNO) REFERENCES OREMP,
+    constraint ORDEPT_ADMRDEPT_FK FOREIGN KEY(ADMRDEPT) REFERENCES ORDEP
+    );
+
+ALTER TABLE OREMP
+ADD constraint OREMP_WORKDEPT_FK FOREIGN KEY(WORKDEPT) REFERENCES ORDEP
+
+insert into ORDEP values(DEPT_T('A00','SPIFFY COMPUTER SERVICE DIV', null,null));
+
+insert into ORDEP values(DEPT_T('B01','Planning', null,(select ref(d) from ORDEP d where d.DEPTNO='A00')));
+
+insert into ORDEP values(DEPT_T('C01','Information Center', null,(select ref(d) from ORDEP d where d.DEPTNO='A00')));
+/
+insert into ORDEP values(DEPT_T('D01','Development Center', null,(select ref(d) from ORDEP d where d.DEPTNO='C01')));
+
+
+update ORDEP d
+set d.ADMRDEPT = (select ref(d) from ORDEP d where d.DEPTNO = 'A00')
+where d.DEPTNO = 'A00'
+
+
+insert into OREMP values(emp_t('000010', 'Christine', 'Hass', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'A00'), 'F', '14-AUG-1953', 72750)
+    )
+
+insert into OREMP values(emp_t('000020', 'Michell', 'Thompson', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'B01'), 'M', '02-FEB-1968', 61250)
+    )
+    
+insert into OREMP values(emp_t('000030', 'Sally', 'Kwan', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'C01'), 'F', '11-MAY-1953', 58250)
+    )
+    
+insert into OREMP values(emp_t('000060', 'Irving', 'Stern', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'D01'), 'M', '07-JUL-1965', 55555)
+    )
+    
+insert into OREMP values(emp_t('000070', 'Eva', 'Pulaksi', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'C01'), 'F', '26-MAY-1973', 56170)
+    )
+    
+insert into OREMP values(emp_t('000050', 'John', 'Geyer', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'C01'), 'M', '15-SEP-1955', 60175)
+    )
+    
+insert into OREMP values(emp_t('000090', 'Eileen', 'Henderson', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'B01'), 'F', '15-MAY-1953', 49750)
+    )
+    
+insert into OREMP values(emp_t('000100', 'Thedore', 'Spenser', 
+    (select ref(d) from ORDEP d where d.DEPTNO = 'B01'), 'M', '18-AUG-1976', 40150)
+    )
+
+
+UPDATE ORDEP d
+set d.MGRNO = (select ref(e) from OREMP e where e.EMPNO = '00010')
+where d.DEPTNO = 'A00'
+
+UPDATE ORDEP d
+set d.MGRNO = (select ref(e) from OREMP e where e.EMPNO = '00020')
+where d.DEPTNO = 'B01'
+
+UPDATE ORDEP d
+set d.MGRNO = (select ref(e) from OREMP e where e.EMPNO = '00030')
+where d.DEPTNO = 'C01'
+
+UPDATE ORDEP d
+set d.MGRNO = (select ref(e) from OREMP e where e.EMPNO = '00060')
+where d.DEPTNO = 'D01'
+
+select * from ORDEP
+
+1)
+SELECT d.WORKDEPT.DEPTNAME, d.LASTNAME as Manager_name
+FROM OREMP  d
+
+2)
+SELECT d.EMPNO , d.LASTNAME as Manager_name ,d.WORKDEPT.DEPTNAME
+FROM OREMP  d
+
+3)
+SELECT d.DEPTNAME, d.DEPTNO ,count(d.ADMRDEPT.DEPTNAME) as CountOfA
+FROM ORDEP d
+
+SELECT d.DEPTNAME, d.DEPTNO,d.ADMRDEPT.DEPTNAME
+FROM ORDEP d
+
+4)
+SELECT d.DEPTNAME, d.DEPTNO,d.ADMRDEPT.DEPTNAME,d.ADMRDEPT.MGRNO.LASTNAME,d.ADMRDEPT.MGRNO.SALARY
+FROM ORDEP d
+5)
+SELECT d.EMPNO , d.LASTNAME ,d.LASTNAME,d.SALARY ,d.WORKDEPT.MGRNO.LASTNAME,d.WORKDEPT.MGRNO.SALARY
+FROM OREMP  d
+6)
+SELECT d.WORKDEPT.DEPTNO,d.WORKDEPT.DEPTNAME,d.SEX,AVG(d.SALARY)
+FROM OREMP  d
+GROUP BY d.WORKDEPT.DEPTNO,d.WORKDEPT.DEPTNAME,d.SEX
+
+
+
